@@ -1,0 +1,41 @@
+name: Validate plugin
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        shell: bash
+        run: |
+          find . -name '*.mjs' -print0 |
+            xargs -0 -n1 node --check
+      - name: Run state tests
+        run: node --test test/state.test.mjs
+      - name: Validate plugin files
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const manifest = JSON.parse(fs.readFileSync('plugin.json', 'utf8'));
+            if (manifest.name !== 'modernization-workflow') throw new Error('Unexpected plugin name');
+            if (manifest.extensions?.['com.github.copilot']?.logo !== 'assets/preview.png') {
+              throw new Error('Canvas preview path must be assets/preview.png');
+            }
+            if (!fs.existsSync('assets/preview.png')) throw new Error('Missing canvas preview');
+            if (!fs.existsSync('extensions/modernization-workflow/extension.mjs')) {
+              throw new Error('Missing extension entry point');
+            }
+          "
